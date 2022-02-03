@@ -1,0 +1,9 @@
+MQ_URL=http://localhost:9324
+MQ_REGION=ru-central1
+MQ_BROKER=sqs
+MQ_USERNAME=x
+MQ_PASSWORD=x
+
+MQ_QUEUE_TEST1=mq-test1
+MQ_QUEUE_TEST2=mq-test2
+MQ_QUEUE_DLQ=dlq

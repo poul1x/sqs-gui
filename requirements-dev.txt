@@ -1,0 +1,5 @@
+-r requirements.txt
+boto3-stubs[sqs]
+python-dotenv
+pdoc3
+black
