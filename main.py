@@ -1,173 +1,248 @@
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-import sys
+from dataclasses import dataclass
+from queue import Queue
+from socket import timeout
+from threading import Lock, Thread
+from time import sleep
+from typing import List, Optional, Set
+import boto3
+import os
 
-class MessageQueueView(QWidget):
+from mypy_boto3_sqs.client import SQSClient
+from mypy_boto3_sqs.service_resource import (
+    SQSServiceResource,
+    Queue as SQSQueue,
+    Message,
+)
 
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout()
-        btnSearch = QPushButton("Search message queue")
-        mqView = QListWidget()
-        mqView.addItems(["mq-one", "mq-two", "mq-three", "mq-four", "mq-five"])
-        layout.addWidget(mqView)
-        layout.addWidget(btnSearch)
-        self.setLayout(layout)
+from botocore.exceptions import ClientError
+from util import TimeMeasure, random_string
+
+from concurrent.futures import ThreadPoolExecutor, wait
+
+QUEUE_TEST = os.environ["MQ_QUEUE_TEST1"]
+
+# def ping(self):
+#     try:
+#         self._client.list_queues(MaxResults=1)
+#     except (ClientConnectionError, ClientError) as e:
+#         raise ChannelError(str(e)) from e
 
 
-class MQPropertiesView(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout()
-        btnSearch = QPushButton("Search mq props")
-        mqView = QListWidget()
-        mqView.addItems(["mq-one", "mq-two", "mq-three"])
-        layout.addWidget(mqView)
-        layout.addWidget(btnSearch)
-        self.setLayout(layout)
+@dataclass
+class ReceiveConditions:
 
-class MessageView(QWidget):
-    def __init__(self):
-        super().__init__()
+    all: bool
+    """Receive all messages"""
 
-        layout = QVBoxLayout()
-        btnSearch = QPushButton("Search message")
-        mqView = QListWidget()
-        mqView.addItems(["msg-one", "msg-two", "msg-three", "A" * 500])
-        layout.addWidget(mqView)
-        layout.addWidget(btnSearch)
-        mqView.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setLayout(layout)
+    count: int
+    """Receive at least N messages"""
 
-class MyTabBar(QTabBar):
+    timeout: int
+    """Receive messages until timeout expiration"""
 
-    def __init__(self) -> None:
-        super().__init__()
-        self.setElideMode(Qt.ElideRight)
 
-    def tabSizeHint(self, i):
-        return QSize(200, 30)
+@dataclass
+class Credentials:
+    access_key: int
+    secret_key: int
+    region_name: str
+    endpoint_url: Optional[str]
 
-    def tabMinimalSizeHint(self, i):
-        return QSize(200, 30)
 
-class MyWindow(QWidget):
+def send_many_messages(n: int, credentials: Credentials):
 
-    def __init__(self):
-        super().__init__()
+    session = boto3.Session()
+    sqs: SQSServiceResource = session.resource(
+        service_name="sqs",
+        region_name=credentials.region_name,
+        aws_access_key_id=credentials.access_key,
+        aws_secret_access_key=credentials.secret_key,
+        endpoint_url=credentials.endpoint_url,
+    )
 
-        # Layouts
-        vBoxLayout = QVBoxLayout()
-        hBoxLayout = QHBoxLayout()
+    queue: SQSQueue = sqs.get_queue_by_name(QueueName=QUEUE_TEST)
+    queue.purge()
 
-        # Frames
-        topLeftFrame = QFrame()
-        bottomLeftFrame = QFrame()
-        rightFrame = QFrame()
-        topLeftFrame.setFrameShape(QFrame.StyledPanel)
-        bottomLeftFrame.setFrameShape(QFrame.StyledPanel)
-        topLeftFrame.setFrameShape(QFrame.StyledPanel)
-        rightFrame.setFrameShape(QFrame.StyledPanel)
+    for _ in range(n):
+        queue.send_message(MessageBody=random_string(40))
 
-        # My widgets
-        mqView = MessageQueueView()
-        propsView = MQPropertiesView()
-        msgView = MessageView()
-        msgView2 = MessageView()
-        msgView3 = MessageView()
-        msgView4 = MessageView()
-        msgView5 = MessageView()
-        tabView = QTabWidget()
+def receive_message(credentials: Credentials):
 
-        # Left frames
-        tmpLayout = QHBoxLayout()
-        tmpLayout.addWidget(mqView)
-        topLeftFrame.setLayout(tmpLayout)
-        tmpLayout = QHBoxLayout()
-        tmpLayout.addWidget(propsView)
-        bottomLeftFrame.setLayout(tmpLayout)
+    session = boto3.Session()
+    sqs: SQSServiceResource = session.resource(
+        service_name="sqs",
+        region_name=credentials.region_name,
+        aws_access_key_id=credentials.access_key,
+        aws_secret_access_key=credentials.secret_key,
+        endpoint_url=credentials.endpoint_url,
+    )
 
-        tabView.setTabBar(MyTabBar())
-        tabView.tabBar().setMovable(True)
-        tabView.tabBar().setAutoHide(True)
-        tabView.tabBar().setTabsClosable(True)
-        tabView.tabBar().setUsesScrollButtons(True)
+    queue: SQSQueue = sqs.get_queue_by_name(QueueName=QUEUE_TEST)
+    queue.receive_messages(MaxNumberOfMessages=1)
 
-        # Tabs
-        tabView.addTab(msgView, "OneTwoThreeFourFiveSixSeven")
-        tabView.addTab(msgView2, "A" * 50)
-        tabView.addTab(msgView3, "A" * 50)
-        tabView.addTab(msgView4, "A" * 50)
-        tabView.addTab(msgView5, "Two")
-        # tabView.setStyleSheet("QTabBar::tab { max-width: 150px; }")
 
-        # self.layout.add
-        # tabView.setLayout()
-        # rightFrame.
+class SQSMessageIterator:
 
-        # Right frames
-        tmpLayout = QHBoxLayout()
-        tmpLayout.addWidget(tabView)
-        rightFrame.setLayout(tmpLayout)
+    _lock: Lock
+    _shutdown: bool
+    _queue_name: str
+    _unique_messages: Queue
+    _unique_message_ids: set
+    _conditions: ReceiveConditions
+    _worker_threads: List[Thread]
+    _checker_thread: Thread
+    _max_num_of_msgs = 10
+    _service_name = "sqs"
 
-        # Splitter 1
-        splitter1 = QSplitter(Qt.Vertical)
-        splitter1.addWidget(topLeftFrame)
-        splitter1.addWidget(bottomLeftFrame)
-        splitter1.setStretchFactor(0, 2)
-        splitter1.setStretchFactor(1, 3)
-        splitter1.handle(1).setAttribute(Qt.WA_Hover)
-        splitter1.setChildrenCollapsible(False)
+    def __init__(
+        self,
+        queue_name: str,
+        credentials: Credentials,
+        conditions: ReceiveConditions,
+        num_workers: Optional[int] = None,
+    ):
+        if num_workers is None:
+            num_workers = (os.cpu_count() or 1) * 5
 
-        # Splitter 2
-        splitter2 = QSplitter(Qt.Horizontal)
-        splitter2.addWidget(splitter1)
-        splitter2.addWidget(rightFrame)
-        splitter2.setStretchFactor(0, 2)
-        splitter2.setStretchFactor(1, 3)
-        splitter2.handle(1).setAttribute(Qt.WA_Hover)
-        splitter2.setChildrenCollapsible(False)
+        if num_workers <= 0:
+            raise ValueError("num_workers must be greater than 0")
 
-        # vBoxLayout.addWidget(splitter1)
-        # vBoxLayout.setStretch(0, 2)
-        # vBoxLayout.setStretch(1, 3)
+        self._lock = Lock()
+        self._shutdown = False
+        self._worker_threads = list()
+        self._unique_messages = Queue()
+        self._unique_message_ids = set()
+        self._checker_thread = Thread(target=self.checker_thread)
+        self._conditions = conditions
+        self._queue_name = queue_name
 
-        # hBoxLayout.addLayout(vBoxLayout)
-        hBoxLayout.addWidget(splitter2)
-        self.setLayout(hBoxLayout)
+        for _ in range(num_workers):
+            session = self._create_session(credentials)
+            thread = Thread(target=self.worker_thread, args=(session,))
+            self._worker_threads.append(thread)
 
-        self.setStyleSheet(
-            """
-                /*QVBoxLayout {
-                    border: 1px solid black;
-                }*/
-                QSplitter::handle:hover {
-                    height: 1px;
-                    width: 1px;
-                    background: red;
-                    color:red;
-                }
-                /*QSplitter::handle {
-                    height: 1px;
-                    width: 1px;
-                    background: blue;
-                    color: blue;
-                }*/
-                QSplitter::handle:pressed {
-                    height: 1px;
-                    width: 1px;
-                    background: blue;
-                    color: blue;
-                }
-            """
+    def __iter__(self):
+        self.start_message_receiving()
+        return self
+
+    def __next__(self):
+
+        message = self._unique_messages.get()
+        if message is not None:
+            return message
+
+        self._checker_thread.join()
+        raise StopIteration()
+
+    def start_message_receiving(self):
+
+        for thread in self._worker_threads:
+            thread.start()
+
+        self._checker_thread.start()
+
+    def _create_session(self, credentials: Credentials):
+        return boto3.Session().resource(
+            service_name=self._service_name,
+            region_name=credentials.region_name,
+            aws_access_key_id=credentials.access_key,
+            aws_secret_access_key=credentials.secret_key,
+            endpoint_url=credentials.endpoint_url,
         )
+
+    def worker_thread(self, sqs: SQSServiceResource):
+
+        """This thread receives messages and puts unique ones into queue"""
+
+        queue: SQSQueue = sqs.get_queue_by_name(
+            QueueName=self._queue_name,
+        )
+
+        while True:
+
+            # Checker thread signals to exit
+            # `Timeout` condition is fulfilled
+            if self._shutdown:
+                return
+
+            # Receive messages from queue
+            # Each received message will be
+            # invisible for `timeout` seconds
+            messages = queue.receive_messages(
+                MaxNumberOfMessages=self._max_num_of_msgs,
+                VisibilityTimeout=self._conditions.timeout,
+                WaitTimeSeconds=0,
+            )
+
+            # No messages left in queue -> exit
+            # `All` condition is fulfilled
+            if not messages:
+                return
+
+            with self._lock:
+
+                for message in messages:
+
+                    # Skip already received message
+                    if message.message_id in self._unique_message_ids:
+                        continue
+
+                    # Save received message
+                    self._unique_message_ids.add(message.message_id)
+                    self._unique_messages.put(message)
+
+                # First N messages have been received -> exit
+                # `Count` condition is fulfilled
+                if not self._conditions.all:
+                    if len(self._unique_message_ids) >= self._conditions.count:
+                        return
+
+    def checker_thread(self):
+
+        """This thread waits until all worker threads finish"""
+
+        interval = 0.5
+        iters = round(self._conditions.timeout / interval)
+
+        for _ in range(iters):
+            sleep(interval)
+            if all(not th.is_alive() for th in self._worker_threads):
+                break
+
+        self._shutdown = True
+        for thread in self._worker_threads:
+            thread.join()
+
+        self._unique_messages.put(None)
+
 
 if __name__ == "__main__":
 
-    app = QApplication(sys.argv)
+    credentials = Credentials(
+        access_key=os.environ["MQ_USERNAME"],
+        secret_key=os.environ["MQ_PASSWORD"],
+        region_name=os.environ["MQ_REGION"],
+        endpoint_url=os.environ["MQ_URL"],
+    )
 
-    myWindow = MyWindow()
-    myWindow.show()
+    conditions = ReceiveConditions(
+        all=False,
+        count=500,
+        timeout=2,
+    )
 
-    sys.exit(app.exec())
+    # receive_message(credentials)
+    # exit(0)
+
+    send_many_messages(5000, credentials)
+
+    measure = TimeMeasure()
+    i = 0
+    with measure.measuring():
+        msg: Message
+        for msg in SQSMessageIterator(QUEUE_TEST, credentials, conditions, 2):
+            i += 1
+
+    print("Received - ", i)
+    print("Elapsed - ", measure.elapsed.seconds)
+
