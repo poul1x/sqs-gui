@@ -102,7 +102,7 @@ class SQSMessageIterator:
         num_workers: Optional[int] = None,
     ):
         if num_workers is None:
-            num_workers = (os.cpu_count() or 1) * 5
+            num_workers = os.cpu_count() or 2
 
         if num_workers <= 0:
             raise ValueError("num_workers must be greater than 0")
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     conditions = ReceiveConditions(
         all=False,
         count=500,
-        timeout=2,
+        timeout=4,
     )
 
     # receive_message(credentials)
@@ -240,7 +240,7 @@ if __name__ == "__main__":
     i = 0
     with measure.measuring():
         msg: Message
-        for msg in SQSMessageIterator(QUEUE_TEST, credentials, conditions, 2):
+        for msg in SQSMessageIterator(QUEUE_TEST, credentials, conditions):
             i += 1
 
     print("Received - ", i)
