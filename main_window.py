@@ -1,31 +1,81 @@
+from ctypes import resize
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import sys
 
-class MessageQueueView(QWidget):
 
+class MessageQueueView(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout()
         btnSearch = QPushButton("Search message queue")
-        mqView = QListWidget()
-        mqView.addItems(["mq-one", "mq-two", "mq-three", "mq-four", "mq-five"])
+
+        mqView = QTableWidget()
+        mqView.setColumnCount(3)
+        mqView.setRowCount(1)
+
+        roFlags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+        rwFlags = Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled
+
+        item1 = QTableWidgetItem("bondifuzz-api-gateway-dev")
+        item1.setFlags(rwFlags)
+
+        item2 = QTableWidgetItem("100")
+        item2.setFlags(roFlags)
+
+        item3 = QTableWidgetItem("12 september 2019")
+        item3.setFlags(roFlags)
+
+        mqView.setItem(0, 0, item1)
+        mqView.setItem(0, 1, item2)
+        mqView.setItem(0, 2, item3)
+
+        mqView.setSortingEnabled(True)
+        mqView.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        mqView.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        mqView.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        # mqView.horizontalHeader().setStre(True)
+        mqView.setHorizontalHeaderLabels(["Queue name", "Messages", "Dumped at"])
+        # mqView.resizeRowsToContents()
+        # mqView.resizeColumnsToContents()
+
+        # mqView.addItems(["mq-one", "mq-two", "mq-three", "mq-four", "mq-five"])
         layout.addWidget(mqView)
         layout.addWidget(btnSearch)
         self.setLayout(layout)
 
+from mq_properties import MyTreeModel, TreeItem
 
 class MQPropertiesView(QWidget):
     def __init__(self):
         super().__init__()
         layout = QVBoxLayout()
         btnSearch = QPushButton("Search mq props")
-        mqView = QListWidget()
-        mqView.addItems(["mq-one", "mq-two", "mq-three"])
+
+        mqView = QTreeView()
+
+        headers = TreeItem(["Key", "Value"])
+        item1 = TreeItem(["awsDffGttsasasass", "10"])
+        item2 = TreeItem(["awsDffGttsasassXXX", "sdadsdsdsddsdssd"])
+        item3 = TreeItem(["asasaaaAAAsssASSS", "dsdwsds"])
+        item2.addChild(item3)
+
+        self.items = [
+            item1,
+            item2,
+        ]
+
+        mqView.setModel(MyTreeModel(headers, self.items, self))
+        mqView.header().setSectionResizeMode(QHeaderView.Interactive)
+        mqView.header().resizeSections(QHeaderView.ResizeToContents)
+        mqView.header().setStretchLastSection(True)
+
+
         layout.addWidget(mqView)
         layout.addWidget(btnSearch)
         self.setLayout(layout)
+
 
 class MessageView(QWidget):
     def __init__(self):
@@ -40,8 +90,8 @@ class MessageView(QWidget):
         mqView.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setLayout(layout)
 
-class MyTabBar(QTabBar):
 
+class MyTabBar(QTabBar):
     def __init__(self) -> None:
         super().__init__()
         self.setElideMode(Qt.ElideRight)
@@ -52,8 +102,8 @@ class MyTabBar(QTabBar):
     def tabMinimalSizeHint(self, i):
         return QSize(200, 30)
 
-class MyWindow(QWidget):
 
+class MyWindow(QWidget):
     def __init__(self):
         super().__init__()
 
@@ -162,6 +212,7 @@ class MyWindow(QWidget):
                 }
             """
         )
+
 
 if __name__ == "__main__":
 

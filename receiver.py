@@ -35,7 +35,7 @@ class ReceiveConditions:
     """Receive all messages"""
 
     count: int
-    """Receive at least N messages"""
+    """Receive at least N messages, then stop"""
 
     timeout: int
     """Receive messages until timeout expiration"""
@@ -226,15 +226,15 @@ if __name__ == "__main__":
     )
 
     conditions = ReceiveConditions(
-        all=False,
-        count=500,
-        timeout=4,
+        all=True,
+        count=1,
+        timeout=10,
     )
 
     # receive_message(credentials)
     # exit(0)
 
-    send_many_messages(5000, credentials)
+    send_many_messages(1000, credentials)
 
     measure = TimeMeasure()
     i = 0
