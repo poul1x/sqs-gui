@@ -1,54 +1,13 @@
+import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from .mq_properties import MyTreeModel, TreeItem
+from .queue_manager import QueueItem, QueueManager
+
+from .properties_manager import MyTreeModel, TreeItem
 
 
-class MessageQueueView(QWidget):
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout()
-        btnSearch = QPushButton("Search message queue")
-
-        mqView = QTableWidget()
-        mqView.setColumnCount(4)
-        mqView.setRowCount(1)
-
-        roFlags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
-        rwFlags = Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled
-
-        item1 = QTableWidgetItem("bondifuzz-api-gateway-dev")
-        item1.setFlags(rwFlags)
-
-        item2 = QTableWidgetItem("Standard DLQ")
-        item2.setFlags(roFlags)
-
-        item3 = QTableWidgetItem("100")
-        item3.setFlags(roFlags)
-
-        item4 = QTableWidgetItem("12 september 2019")
-        item4.setFlags(roFlags)
-
-        mqView.setItem(0, 0, item1)
-        mqView.setItem(0, 1, item2)
-        mqView.setItem(0, 2, item3)
-        mqView.setItem(0, 3, item4)
-
-        mqView.setSortingEnabled(True)
-        mqView.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        mqView.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        mqView.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        mqView.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        # mqView.horizontalHeader().setStre(True)
-        mqView.setHorizontalHeaderLabels(["Queue name", "Queue type", "Messages", "Dumped at"])
-        # mqView.resizeRowsToContents()
-        # mqView.resizeColumnsToContents()
-
-        # mqView.addItems(["mq-one", "mq-two", "mq-three", "mq-four", "mq-five"])
-        layout.addWidget(mqView)
-        layout.addWidget(btnSearch)
-        self.setLayout(layout)
 
 
 class MQPropertiesView(QWidget):
@@ -107,7 +66,7 @@ class MyTabBar(QTabBar):
         return QSize(200, 30)
 
 
-class MyWindow(QWidget):
+class CentralWidget(QWidget):
     def __init__(self):
         super().__init__()
 
@@ -125,7 +84,14 @@ class MyWindow(QWidget):
         rightFrame.setFrameShape(QFrame.StyledPanel)
 
         # My widgets
-        mqView = MessageQueueView()
+        mqView = QueueManager()
+        mqView.setQueueItems([
+            QueueItem("bondifuzz-api-gateway", "Standard Queue", "102", "14:12.1222"),
+            QueueItem("bondifuzz-scheduler", "Standard Queue", "103", "12:14.1222"),
+            QueueItem("bondifuzz-starter", "Standard Queue", "106", "13:12.1222"),
+            QueueItem("bondifuzz-dlq", "Standard DLQ", "101", "12:13.1222"),
+        ])
+
         propsView = MQPropertiesView()
         msgView = MessageView()
         msgView2 = MessageView()
@@ -189,6 +155,7 @@ class MyWindow(QWidget):
 
         # hBoxLayout.addLayout(vBoxLayout)
         hBoxLayout.addWidget(splitter2)
+
         self.setLayout(hBoxLayout)
 
         self.setStyleSheet(
@@ -216,3 +183,29 @@ class MyWindow(QWidget):
                 }
             """
         )
+
+class MainWindow(QMainWindow):
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.initUI()
+
+    def setupExitAction(self):
+        exitAction = QAction("&Exit", self)
+        exitAction.setShortcut('Ctrl+Q')
+        exitAction.setStatusTip('Exit application')
+        exitAction.triggered.connect(qApp.quit)
+
+        menubar = self.menuBar()
+        fileMenu = menubar.addMenu('&File')
+        fileMenu.addAction(exitAction)
+
+    def setupMenuBar(self):
+        self.setupExitAction()
+
+
+    def initUI(self):
+        self.setCentralWidget(CentralWidget())
+        # self.statusBar().showMessage('Ready')
+        self.setWindowTitle('SQS Graphical user interface')
+        self.setupMenuBar()

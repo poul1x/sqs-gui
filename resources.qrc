@@ -1,0 +1,6 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource>
+    <file alias="search.svg">resources/search.svg</file>
+  </qresource>
+</RCC>

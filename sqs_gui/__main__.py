@@ -1,5 +1,4 @@
 from logging.config import dictConfig
-import coloredlogs # Needed for pyinstaller
 import yaml
 
 from sqs_gui.app import runApp

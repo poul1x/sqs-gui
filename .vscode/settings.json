@@ -1,6 +1,7 @@
 {
   "python.formatting.provider": "black",
   "files.exclude": {
-    "venv/": true
+    "venv/": true,
+    "sqs_gui/app/resources.py": true
   }
 }

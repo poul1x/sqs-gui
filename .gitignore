@@ -32,6 +32,9 @@ venv/
 *.gpg
 *.key
 
+# PyQt5 related
+/sqs_gui/app/resources.py
+
 # Development files
 /.env*
 /docker-compose.yml
