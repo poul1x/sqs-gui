@@ -15,7 +15,7 @@ from mypy_boto3_sqs.service_resource import (
 )
 
 from botocore.exceptions import ClientError
-from util import TimeMeasure, random_string
+from .util import TimeMeasure, random_string
 
 from concurrent.futures import ThreadPoolExecutor, wait
 

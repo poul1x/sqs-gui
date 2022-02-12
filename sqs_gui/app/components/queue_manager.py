@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass
 from enum import Enum
 
@@ -18,21 +18,23 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QLineEdit,
 )
+from sqs_gui.app.queues import list_message_queues
+
+from sqs_gui.app.receiver import Credentials
 
 
 @dataclass
 class QueueItem:
     queueName: str
-    queueType: str
     numMessages: str
     dumpedAt: str
 
 
 class Columns(int, Enum):
     queueName = 0
-    queueType = 1
-    numMessages = 2
-    dumpedAt = 3
+    numMessages = 1
+    dumpedAt = 2
+
 
 
 class QueueManager(QWidget):
@@ -48,9 +50,6 @@ class QueueManager(QWidget):
         itemName = QStandardItem(item.queueName)
         itemName.setFlags(rwFlags)
 
-        itemType = QStandardItem(item.queueType)
-        itemType.setFlags(roFlags)
-
         itemMessages = QStandardItem(item.numMessages)
         itemMessages.setFlags(roFlags)
 
@@ -59,14 +58,13 @@ class QueueManager(QWidget):
 
         return [
             itemName,
-            itemType,
             itemMessages,
             itemDumpedAt,
         ]
 
     def initUI(self):
 
-        labels = ["Queue name", "Queue type", "Messages", "Dumped at"]
+        labels = ["Queue name", "Messages", "Dumped at"]
         dataModel = QStandardItemModel(0, len(Columns))
         dataModel.setHorizontalHeaderLabels(labels)
 
@@ -80,7 +78,6 @@ class QueueManager(QWidget):
 
         hHeader = table.horizontalHeader()
         hHeader.setSectionResizeMode(Columns.queueName, QHeaderView.Stretch)
-        hHeader.setSectionResizeMode(Columns.queueType, QHeaderView.ResizeToContents)
         hHeader.setSectionResizeMode(Columns.numMessages, QHeaderView.ResizeToContents)
         hHeader.setSectionResizeMode(Columns.dumpedAt, QHeaderView.ResizeToContents)
         hHeader.setDefaultAlignment(Qt.AlignLeft)

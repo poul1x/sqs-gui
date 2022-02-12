@@ -81,16 +81,27 @@ class MyTreeModel(QAbstractItemModel):
     def __init__(
         self,
         headers: TreeItem,
-        dataItems: List[TreeItem],
         parent: QWidget,
     ):
         super().__init__(parent)
         self._rootItem = headers
         self._numColumns = headers.columnCount()
-        self.setupModelData(dataItems)
 
-    def setupModelData(self, dataItems: List[TreeItem]):
-        for item in dataItems:
+    def setTreeItems(self, treeItems: List[TreeItem]):
+
+        # def rm(items: TreeItem):
+
+        #     for item in items:
+        #         if item._children:
+        #             rm(item._children)
+
+        #     item._parent = None
+        #     item._children = []
+
+        # rm([self._rootItem])
+
+        self._rootItem._children = []
+        for item in treeItems:
             assert item.columnCount() == self._numColumns
             self._rootItem.addChild(item)
 
@@ -153,6 +164,7 @@ class MyTreeModel(QAbstractItemModel):
             return Qt.NoItemFlags
 
         defaultFlags = super().flags(index)
+        return defaultFlags
 
         if index.column() == 0:
             return defaultFlags
@@ -179,22 +191,3 @@ class MyTreeModel(QAbstractItemModel):
             return self._rootItem.data(section)
 
         return None
-
-
-class MyTree(QTreeView):
-
-    def __init__(self):
-        super().__init__()
-
-        headers = TreeItem(["Key", "Value"])
-        item1 = TreeItem(["a", "b"])
-        item2 = TreeItem(["c", "d"])
-        item3 = TreeItem(["k", "f"])
-        item2.addChild(item3)
-
-        self.items = [
-            item1,
-            item2,
-        ]
-
-        self.setModel(MyTreeModel(headers, self.items, self))

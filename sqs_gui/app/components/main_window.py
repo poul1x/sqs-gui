@@ -1,43 +1,59 @@
+from asyncio import QueueEmpty
 import datetime
+from typing import List
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+
+from sqs_gui.app.receiver import Credentials
 
 from .queue_manager import QueueItem, QueueManager
 
 from .properties_manager import MyTreeModel, TreeItem
 
-
-
+class MyFilterModel(QSortFilterProxyModel):
+    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
+        return True
 
 class MQPropertiesView(QWidget):
     def __init__(self):
         super().__init__()
-        layout = QVBoxLayout()
-        btnSearch = QPushButton("Search mq props")
 
-        mqView = QTreeView()
+        layout = QVBoxLayout()
 
         headers = TreeItem(["Key", "Value"])
-        item1 = TreeItem(["awsDffGttsasasass", "10"])
-        item2 = TreeItem(["awsDffGttsasassXXX", "sdadsdsdsddsdssd"])
-        item3 = TreeItem(["asasaaaAAAsssASSS", "dsdwsds"])
-        item2.addChild(item3)
+        self._model =MyTreeModel(headers, self)
 
-        self.items = [
-            item1,
-            item2,
-        ]
+        filterProxyModel = QSortFilterProxyModel(self)
+        filterProxyModel.setSourceModel(self._model)
+        filterProxyModel.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        filterProxyModel.setRecursiveFilteringEnabled(True)
+        # filterProxyModel.setFilterKeyColumn(0)
+        # filterProxyModel.setDynamicSortFilter(False)
 
-        mqView.setModel(MyTreeModel(headers, self.items, self))
-        mqView.header().setSectionResizeMode(QHeaderView.Interactive)
-        mqView.header().resizeSections(QHeaderView.ResizeToContents)
-        mqView.header().setStretchLastSection(True)
+        self._mqView = QTreeView()
+        self._mqView.setModel(filterProxyModel)
 
+        # self._model.setTreeItems([TreeItem(["b", "V"])])
 
-        layout.addWidget(mqView)
-        layout.addWidget(btnSearch)
+        self._mqView.header().setSectionResizeMode(QHeaderView.Interactive)
+        self._mqView.header().resizeSections(QHeaderView.ResizeToContents)
+        self._mqView.header().setStretchLastSection(True)
+        self._mqView.expandAll()
+
+        searchField = QLineEdit()
+        searchField.setPlaceholderText("Enter property name to find")
+        searchField.addAction(QIcon(":search.svg"), QLineEdit.LeadingPosition)
+        searchField.textChanged.connect(filterProxyModel.setFilterFixedString)
+
+        layout.addWidget(self._mqView)
+        layout.addWidget(searchField)
         self.setLayout(layout)
+
+    def setTreeItems(self, items: List[TreeItem]):
+        self._model.setTreeItems(items)
+        self._mqView.model().invalidate()
+        self._mqView.expandAll()
 
 
 class MessageView(QWidget):
@@ -65,10 +81,16 @@ class MyTabBar(QTabBar):
     def tabMinimalSizeHint(self, i):
         return QSize(200, 30)
 
+def credentials():
+    return Credentials("root", "toortoor", "us-east-1", "http://localhost:9324")
 
 class CentralWidget(QWidget):
-    def __init__(self):
+
+    _creds: Credentials
+
+    def __init__(self, creds: Credentials):
         super().__init__()
+        self._creds = creds
 
         # Layouts
         vBoxLayout = QVBoxLayout()
@@ -83,16 +105,38 @@ class CentralWidget(QWidget):
         topLeftFrame.setFrameShape(QFrame.StyledPanel)
         rightFrame.setFrameShape(QFrame.StyledPanel)
 
-        # My widgets
+        self._queues = list_message_queues(self._creds)
         mqView = QueueManager()
-        mqView.setQueueItems([
-            QueueItem("bondifuzz-api-gateway", "Standard Queue", "102", "14:12.1222"),
-            QueueItem("bondifuzz-scheduler", "Standard Queue", "103", "12:14.1222"),
-            QueueItem("bondifuzz-starter", "Standard Queue", "106", "13:12.1222"),
-            QueueItem("bondifuzz-dlq", "Standard DLQ", "101", "12:13.1222"),
-        ])
+
+        for queue in self._queues:
+            queueInfo = queue.info()
+            mqView.addQueueItem(
+                QueueItem(
+                    queueName=queueInfo.name,
+                    numMessages=queueInfo.numMessages,
+                    dumpedAt=queueInfo.dumpDate,
+                )
+            )
+
+        queueInfo = self._queues[0].info()
+
+        rightVal = "<Empty>" if len(queueInfo.tags) == 0 else ""
+        itemTags = TreeItem(["Tags", rightVal])
+        for key, val in queueInfo.tags:
+            item = TreeItem([key, val])
+            itemTags.addChild(item)
+
+        rightVal = "<Empty>" if len(queueInfo.attributes) == 0 else ""
+        itemAttrs = TreeItem(["Attributes", rightVal])
+        for key, val in queueInfo.attributes.items():
+            item = TreeItem([key, val or "<Unknown>"])
+            itemAttrs.addChild(item)
 
         propsView = MQPropertiesView()
+        propsView.setTreeItems([itemTags, itemAttrs])
+        # propsView.setTreeItems([itemTags, itemAttrs])
+        # propsView.setTreeItems([TreeItem(["c", "d"])])
+
         msgView = MessageView()
         msgView2 = MessageView()
         msgView3 = MessageView()
@@ -184,28 +228,35 @@ class CentralWidget(QWidget):
             """
         )
 
+
+from ..queues import MessageQueue, list_message_queues
+
+
 class MainWindow(QMainWindow):
 
-    def __init__(self) -> None:
+    _creds: Credentials
+
+    def __init__(self, creds: Credentials = credentials()) -> None:
         super().__init__()
+        self._creds = creds
         self.initUI()
 
     def setupExitAction(self):
         exitAction = QAction("&Exit", self)
-        exitAction.setShortcut('Ctrl+Q')
-        exitAction.setStatusTip('Exit application')
+        exitAction.setShortcut("Ctrl+Q")
+        exitAction.setStatusTip("Exit application")
         exitAction.triggered.connect(qApp.quit)
 
         menubar = self.menuBar()
-        fileMenu = menubar.addMenu('&File')
+        fileMenu = menubar.addMenu("&File")
         fileMenu.addAction(exitAction)
 
     def setupMenuBar(self):
         self.setupExitAction()
 
-
     def initUI(self):
-        self.setCentralWidget(CentralWidget())
+
+        self.setCentralWidget(CentralWidget(self._creds))
         # self.statusBar().showMessage('Ready')
-        self.setWindowTitle('SQS Graphical user interface')
+        self.setWindowTitle("SQS Graphical user interface")
         self.setupMenuBar()
