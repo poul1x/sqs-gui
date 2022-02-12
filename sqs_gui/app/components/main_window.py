@@ -11,10 +11,6 @@ from .queue_manager import QueueItem, QueueManager
 
 from .properties_manager import MyTreeModel, TreeItem
 
-class MyFilterModel(QSortFilterProxyModel):
-    def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
-        return True
-
 class MQPropertiesView(QWidget):
     def __init__(self):
         super().__init__()
