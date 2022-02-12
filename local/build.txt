@@ -1,0 +1,2 @@
+1. pyinstaller --onefile "sqs_gui\__main__.py"
+2. Copy logging.yaml

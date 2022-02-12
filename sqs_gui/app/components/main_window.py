@@ -1,8 +1,8 @@
-from ctypes import resize
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-import sys
+
+from .mq_properties import MyTreeModel, TreeItem
 
 
 class MessageQueueView(QWidget):
@@ -12,7 +12,7 @@ class MessageQueueView(QWidget):
         btnSearch = QPushButton("Search message queue")
 
         mqView = QTableWidget()
-        mqView.setColumnCount(3)
+        mqView.setColumnCount(4)
         mqView.setRowCount(1)
 
         roFlags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
@@ -21,22 +21,27 @@ class MessageQueueView(QWidget):
         item1 = QTableWidgetItem("bondifuzz-api-gateway-dev")
         item1.setFlags(rwFlags)
 
-        item2 = QTableWidgetItem("100")
+        item2 = QTableWidgetItem("Standard DLQ")
         item2.setFlags(roFlags)
 
-        item3 = QTableWidgetItem("12 september 2019")
+        item3 = QTableWidgetItem("100")
         item3.setFlags(roFlags)
+
+        item4 = QTableWidgetItem("12 september 2019")
+        item4.setFlags(roFlags)
 
         mqView.setItem(0, 0, item1)
         mqView.setItem(0, 1, item2)
         mqView.setItem(0, 2, item3)
+        mqView.setItem(0, 3, item4)
 
         mqView.setSortingEnabled(True)
         mqView.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         mqView.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         mqView.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        mqView.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         # mqView.horizontalHeader().setStre(True)
-        mqView.setHorizontalHeaderLabels(["Queue name", "Messages", "Dumped at"])
+        mqView.setHorizontalHeaderLabels(["Queue name", "Queue type", "Messages", "Dumped at"])
         # mqView.resizeRowsToContents()
         # mqView.resizeColumnsToContents()
 
@@ -45,7 +50,6 @@ class MessageQueueView(QWidget):
         layout.addWidget(btnSearch)
         self.setLayout(layout)
 
-from mq_properties import MyTreeModel, TreeItem
 
 class MQPropertiesView(QWidget):
     def __init__(self):
@@ -212,13 +216,3 @@ class MyWindow(QWidget):
                 }
             """
         )
-
-
-if __name__ == "__main__":
-
-    app = QApplication(sys.argv)
-
-    myWindow = MyWindow()
-    myWindow.show()
-
-    sys.exit(app.exec())

@@ -198,10 +198,3 @@ class MyTree(QTreeView):
         ]
 
         self.setModel(MyTreeModel(headers, self.items, self))
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    mytree = MyTree()
-    mytree.show()
-    sys.exit(app.exec_())
