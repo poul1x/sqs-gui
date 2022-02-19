@@ -119,14 +119,14 @@ class CentralWidget(QWidget):
         itemTags = TreeItem(["Tags", rightVal])
         for key, val in queueInfo.tags:
             item = TreeItem([key, val])
-            item.setEditable(1, True)
+            # item.setEditable(1, True)
             itemTags.addChild(item)
 
         rightVal = "<Empty>" if len(queueInfo.attributes) == 0 else ""
         itemAttrs = TreeItem(["Attributes", rightVal])
         for key, val in queueInfo.attributes.items():
             item = TreeItem([key, val or "<Unknown>"])
-            item.setEditable(1, True)
+            # item.setEditable(1, True)
             itemAttrs.addChild(item)
 
         propsView = MQPropertiesView()

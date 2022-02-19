@@ -12,15 +12,13 @@ from PyQt5.QtGui import (
     QStandardItem,
 )
 from PyQt5.QtWidgets import (
+    QAbstractItemView,
     QWidget,
     QVBoxLayout,
     QTableView,
     QHeaderView,
     QLineEdit,
 )
-from sqs_gui.app.queues import list_message_queues
-
-from sqs_gui.app.receiver import Credentials
 
 
 @dataclass
@@ -36,31 +34,13 @@ class Columns(int, Enum):
     dumpedAt = 2
 
 
-
 class QueueManager(QWidget):
+
+    """Shows list of queues in a table widget"""
+
     def __init__(self):
         super().__init__()
         self.initUI()
-
-    def _standardItemsFromQueueItem(self, item: QueueItem):
-
-        roFlags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
-        rwFlags = Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled
-
-        itemName = QStandardItem(item.queueName)
-        itemName.setFlags(rwFlags)
-
-        itemMessages = QStandardItem(item.numMessages)
-        itemMessages.setFlags(roFlags)
-
-        itemDumpedAt = QStandardItem(item.dumpedAt)
-        itemDumpedAt.setFlags(roFlags)
-
-        return [
-            itemName,
-            itemMessages,
-            itemDumpedAt,
-        ]
 
     def initUI(self):
 
@@ -75,6 +55,7 @@ class QueueManager(QWidget):
 
         table = QTableView()
         table.setModel(filterProxyModel)
+        table.setEditTriggers(QAbstractItemView.EditKeyPressed)
 
         hHeader = table.horizontalHeader()
         hHeader.setSectionResizeMode(Columns.queueName, QHeaderView.Stretch)
@@ -98,8 +79,21 @@ class QueueManager(QWidget):
         self.setLayout(layout)
 
     def addQueueItem(self, item: QueueItem):
-        items = self._standardItemsFromQueueItem(item)
-        self._dataModel.appendRow(items)
+
+        roFlags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+        rwFlags = Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled
+
+        itemName = QStandardItem(item.queueName)
+        itemName.setFlags(rwFlags)
+
+        itemMessages = QStandardItem(item.numMessages)
+        itemMessages.setFlags(roFlags)
+
+        itemDumpedAt = QStandardItem(item.dumpedAt)
+        itemDumpedAt.setFlags(roFlags)
+
+        row = [itemName, itemMessages, itemDumpedAt]
+        self._dataModel.appendRow(row)
 
     def setQueueItems(self, items: List[QueueItem]):
         for item in items:
