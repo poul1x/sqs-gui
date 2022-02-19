@@ -9,7 +9,7 @@ from sqs_gui.app.receiver import Credentials
 
 from .queue_manager import QueueItem, QueueManager
 
-from .properties_manager import MyTreeModel, TreeItem
+from .properties_manager import EditableTreeModel, TreeItem
 
 class MQPropertiesView(QWidget):
     def __init__(self):
@@ -17,8 +17,8 @@ class MQPropertiesView(QWidget):
 
         layout = QVBoxLayout()
 
-        headers = TreeItem(["Key", "Value"])
-        self._model =MyTreeModel(headers, self)
+        headers = TreeItem(["Attribute name", "Value"])
+        self._model =EditableTreeModel(headers, self)
 
         filterProxyModel = QSortFilterProxyModel(self)
         filterProxyModel.setSourceModel(self._model)
@@ -30,12 +30,11 @@ class MQPropertiesView(QWidget):
         self._mqView = QTreeView()
         self._mqView.setModel(filterProxyModel)
 
-        # self._model.setTreeItems([TreeItem(["b", "V"])])
+        # self._model.setItems([TreeItem(["b", "V"])])
 
         self._mqView.header().setSectionResizeMode(QHeaderView.Interactive)
         self._mqView.header().resizeSections(QHeaderView.ResizeToContents)
         self._mqView.header().setStretchLastSection(True)
-        self._mqView.expandAll()
 
         searchField = QLineEdit()
         searchField.setPlaceholderText("Enter property name to find")
@@ -46,9 +45,9 @@ class MQPropertiesView(QWidget):
         layout.addWidget(searchField)
         self.setLayout(layout)
 
-    def setTreeItems(self, items: List[TreeItem]):
-        self._model.setTreeItems(items)
-        self._mqView.model().invalidate()
+    def setItems(self, items: List[TreeItem]):
+        self._model.setItems(items)
+        self._mqView.header().resizeSections(QHeaderView.ResizeToContents)
         self._mqView.expandAll()
 
 
@@ -120,18 +119,20 @@ class CentralWidget(QWidget):
         itemTags = TreeItem(["Tags", rightVal])
         for key, val in queueInfo.tags:
             item = TreeItem([key, val])
+            item.setEditable(1, True)
             itemTags.addChild(item)
 
         rightVal = "<Empty>" if len(queueInfo.attributes) == 0 else ""
         itemAttrs = TreeItem(["Attributes", rightVal])
         for key, val in queueInfo.attributes.items():
             item = TreeItem([key, val or "<Unknown>"])
+            item.setEditable(1, True)
             itemAttrs.addChild(item)
 
         propsView = MQPropertiesView()
-        propsView.setTreeItems([itemTags, itemAttrs])
-        # propsView.setTreeItems([itemTags, itemAttrs])
-        # propsView.setTreeItems([TreeItem(["c", "d"])])
+        propsView.setItems([itemTags, itemAttrs])
+        # propsView.setItems([itemTags, itemAttrs])
+        # propsView.setItems([TreeItem(["c", "d"])])
 
         msgView = MessageView()
         msgView2 = MessageView()

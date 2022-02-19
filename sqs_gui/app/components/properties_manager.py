@@ -4,13 +4,14 @@ from typing import List, Optional, Any
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-import sys
 
 # See https://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html
+
 
 class TreeItem:
 
     _dataItems: List[str]
+    _dataItemsEditable: List[bool]
     _children: List[TreeItem]
     _parent: Optional[TreeItem]
 
@@ -19,9 +20,40 @@ class TreeItem:
         dataItems: List[str] = [],
         parent: Optional[TreeItem] = None,
     ) -> None:
+        self._dataItemsEditable = [False for _ in range(len(dataItems))]
         self._dataItems = dataItems
         self._parent = parent
         self._children = []
+
+    def isEditable(self, column: int):
+
+        if column < 0 or column > len(self._dataItemsEditable):
+            return False
+
+        return self._dataItemsEditable[column]
+
+    def setEditable(self, column: int, isEditable: bool):
+
+        if column < 0 or column > len(self._dataItemsEditable):
+            return False
+
+        self._dataItemsEditable[column] = isEditable
+        return True
+
+    def data(self, column: int):
+
+        if column < 0 or column > len(self._dataItems):
+            return None
+
+        return self._dataItems[column]
+
+    def setData(self, column: int, data: str) -> bool:
+
+        if column < 0 or column > len(self._dataItems):
+            return False
+
+        self._dataItems[column] = data
+        return True
 
     def child(self, row: int):
 
@@ -30,10 +62,18 @@ class TreeItem:
 
         return self._children[row]
 
-
     def addChild(self, item: TreeItem):
-        item.setParentItem(self)
+        item._parent = self
         self._children.append(item)
+
+    def removeChild(self, item: TreeItem):
+        item._parent = None
+        self._children.remove(item)
+
+    def removeChildren(self):
+        for child in self._children:
+            child._parent = None
+        self._children.clear()
 
     def childCount(self):
         return len(self._children)
@@ -51,29 +91,11 @@ class TreeItem:
     def columnCount(self):
         return len(self._dataItems)
 
-    def data(self, column: int):
-
-        if column < 0 or column > len(self._dataItems):
-            return None
-
-        return self._dataItems[column]
-
-    def setData(self, column: int, data: str) -> bool:
-
-        if column < 0 or column > len(self._dataItems):
-            return False
-
-        self._dataItems[column] = data
-        return True
-
     def parentItem(self):
         return self._parent
 
-    def setParentItem(self, item: TreeItem):
-        self._parent = item
 
-
-class MyTreeModel(QAbstractItemModel):
+class EditableTreeModel(QAbstractItemModel):
 
     _rootItem: TreeItem
     _numColumns: int
@@ -87,23 +109,16 @@ class MyTreeModel(QAbstractItemModel):
         self._rootItem = headers
         self._numColumns = headers.columnCount()
 
-    def setTreeItems(self, treeItems: List[TreeItem]):
+    def setItems(self, treeItems: List[TreeItem]):
 
-        # def rm(items: TreeItem):
+        self.layoutAboutToBeChanged.emit()
 
-        #     for item in items:
-        #         if item._children:
-        #             rm(item._children)
-
-        #     item._parent = None
-        #     item._children = []
-
-        # rm([self._rootItem])
-
-        self._rootItem._children = []
+        self._rootItem.removeChildren()
         for item in treeItems:
             assert item.columnCount() == self._numColumns
             self._rootItem.addChild(item)
+
+        self.layoutChanged.emit()
 
     def itemFromIndex(self, index: QModelIndex) -> TreeItem:
 
@@ -130,8 +145,7 @@ class MyTreeModel(QAbstractItemModel):
         childItem = self.itemFromIndex(index)
         parentItem = childItem.parentItem()
 
-        assert parentItem is not None
-        if parentItem == self._rootItem:
+        if not parentItem or parentItem == self._rootItem:
             return QModelIndex()
 
         return self.createIndex(parentItem.row(), 0, parentItem)
@@ -164,12 +178,12 @@ class MyTreeModel(QAbstractItemModel):
             return Qt.NoItemFlags
 
         defaultFlags = super().flags(index)
+        item = self.itemFromIndex(index)
+
+        if item.isEditable(index.column()):
+            return defaultFlags | Qt.ItemIsEditable
+
         return defaultFlags
-
-        if index.column() == 0:
-            return defaultFlags
-
-        return defaultFlags | Qt.ItemIsEditable
 
     def setData(self, index: QModelIndex, value: Any, role: int) -> bool:
 

@@ -1,4 +1,5 @@
 -r requirements.txt
+pyqt5-stubs
 boto3-stubs[sqs]
 python-dotenv
 pdoc3

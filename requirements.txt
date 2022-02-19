@@ -2,4 +2,3 @@ boto3
 PyYAML
 coloredlogs
 pyqt5-tools
-pyqt5-stubs
