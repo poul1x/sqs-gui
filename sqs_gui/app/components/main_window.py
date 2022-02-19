@@ -7,48 +7,10 @@ from PyQt5.QtGui import *
 
 from sqs_gui.app.receiver import Credentials
 
-from .queue_manager import QueueItem, QueueManager
+from .queues_pane import QueueItem, MessageQueuesPane
 
-from .properties_manager import EditableTreeModel, TreeItem
+from .properties_pane import MQPropertiesPane
 
-class MQPropertiesView(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        layout = QVBoxLayout()
-
-        headers = TreeItem(["Attribute name", "Value"])
-        self._model =EditableTreeModel(headers, self)
-
-        filterProxyModel = QSortFilterProxyModel(self)
-        filterProxyModel.setSourceModel(self._model)
-        filterProxyModel.setFilterCaseSensitivity(Qt.CaseInsensitive)
-        filterProxyModel.setRecursiveFilteringEnabled(True)
-        # filterProxyModel.setFilterKeyColumn(0)
-        # filterProxyModel.setDynamicSortFilter(False)
-
-        self._mqView = QTreeView()
-        self._mqView.setModel(filterProxyModel)
-
-        # self._model.setItems([TreeItem(["b", "V"])])
-
-        self._mqView.header().setSectionResizeMode(QHeaderView.Interactive)
-        self._mqView.header().resizeSections(QHeaderView.ResizeToContents)
-        self._mqView.header().setStretchLastSection(True)
-
-        searchField = QLineEdit()
-        searchField.setPlaceholderText("Enter property name to find")
-        searchField.addAction(QIcon(":search.svg"), QLineEdit.LeadingPosition)
-        searchField.textChanged.connect(filterProxyModel.setFilterFixedString)
-
-        layout.addWidget(self._mqView)
-        layout.addWidget(searchField)
-        self.setLayout(layout)
-
-    def setItems(self, items: List[TreeItem]):
-        self._model.setItems(items)
-        self._mqView.header().resizeSections(QHeaderView.ResizeToContents)
-        self._mqView.expandAll()
 
 
 class MessageView(QWidget):
@@ -101,11 +63,11 @@ class CentralWidget(QWidget):
         rightFrame.setFrameShape(QFrame.StyledPanel)
 
         self._queues = list_message_queues(self._creds)
-        mqView = QueueManager()
+        mqView = MessageQueuesPane()
 
         for queue in self._queues:
             queueInfo = queue.info()
-            mqView.addQueueItem(
+            mqView.addItem(
                 QueueItem(
                     queueName=queueInfo.name,
                     numMessages=queueInfo.numMessages,
@@ -115,22 +77,8 @@ class CentralWidget(QWidget):
 
         queueInfo = self._queues[0].info()
 
-        rightVal = "<Empty>" if len(queueInfo.tags) == 0 else ""
-        itemTags = TreeItem(["Tags", rightVal])
-        for key, val in queueInfo.tags:
-            item = TreeItem([key, val])
-            # item.setEditable(1, True)
-            itemTags.addChild(item)
-
-        rightVal = "<Empty>" if len(queueInfo.attributes) == 0 else ""
-        itemAttrs = TreeItem(["Attributes", rightVal])
-        for key, val in queueInfo.attributes.items():
-            item = TreeItem([key, val or "<Unknown>"])
-            # item.setEditable(1, True)
-            itemAttrs.addChild(item)
-
-        propsView = MQPropertiesView()
-        propsView.setItems([itemTags, itemAttrs])
+        propsPane = MQPropertiesPane()
+        propsPane.setItems(queueInfo.attributes, queueInfo.tags)
         # propsView.setItems([itemTags, itemAttrs])
         # propsView.setItems([TreeItem(["c", "d"])])
 
@@ -146,7 +94,7 @@ class CentralWidget(QWidget):
         tmpLayout.addWidget(mqView)
         topLeftFrame.setLayout(tmpLayout)
         tmpLayout = QHBoxLayout()
-        tmpLayout.addWidget(propsView)
+        tmpLayout.addWidget(propsPane)
         bottomLeftFrame.setLayout(tmpLayout)
 
         tabView.setTabBar(MyTabBar())

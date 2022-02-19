@@ -44,12 +44,29 @@ class QueueInfo:
     attributes: Dict[str, str]
 
 
-class QueueType(str, Enum):
-    STANDARD = "Standard queue"
-    DLQ = "Dead Letter Queue"
-    FIFO = "FIFO Queue"
-    FIFO_DLQ = "FIFO Queue"
-
+_QUEUE_ATTRS = [
+    "ApproximateNumberOfMessages",
+    "ApproximateNumberOfMessagesDelayed",
+    "ApproximateNumberOfMessagesNotVisible",
+    "ContentBasedDeduplication",
+    "CreatedTimestamp",
+    "DeduplicationScope",
+    "DelaySeconds",
+    "FifoQueue",
+    "FifoThroughputLimit",
+    "KmsDataKeyReusePeriodSeconds",
+    "KmsMasterKeyId",
+    "LastModifiedTimestamp",
+    "MaximumMessageSize",
+    "MessageRetentionPeriod",
+    "Policy",
+    "QueueArn",
+    "ReceiveMessageWaitTimeSeconds",
+    "RedriveAllowPolicy",
+    "RedrivePolicy",
+    "SqsManagedSseEnabled",
+    "VisibilityTimeout",
+]
 
 from mypy_boto3_sqs.client import SQSClient
 from mypy_boto3_sqs.service_resource import (
@@ -83,23 +100,6 @@ class MessageQueue:
         resp: dict = client.list_queue_tags(QueueUrl=self._queue.url)
         return resp.get("Tags", dict())
 
-    # def _get_queue_type(self, sourceQueues: list) -> str:
-
-    #     hasSourceQueues = len(sourceQueues) != 0
-    #     isFifoQueue = self._queue_name.endswith(".fifo")
-
-    #     if isFifoQueue:
-    #         part1 = "FIFO"
-    #     else:
-    #         part1 = "Standard"
-
-    #     if hasSourceQueues:
-    #         part2 = "DLQ"
-    #     else:
-    #         part2 = "queue"
-
-    #     return f"{part1} {part2}"
-
     def _get_queue_attributes(self):
 
         url = self._queue.url
@@ -107,29 +107,7 @@ class MessageQueue:
         resp = client.get_queue_attributes(QueueUrl=url, AttributeNames=["All"])
         attrs = resp["Attributes"]
 
-        return {
-            "ApproximateNumberOfMessages":attrs.get("ApproximateNumberOfMessages", "<Unknown>"),
-            "ApproximateNumberOfMessagesDelayed":attrs.get("ApproximateNumberOfMessagesDelayed", "<Unknown>"),
-            "ApproximateNumberOfMessagesNotVisible":attrs.get("ApproximateNumberOfMessagesNotVisible", "<Unknown>"),
-            "ContentBasedDeduplication":attrs.get("ContentBasedDeduplication", "<Unknown>"),
-            "CreatedTimestamp":attrs.get("CreatedTimestamp", "<Unknown>"),
-            "DeduplicationScope":attrs.get("DeduplicationScope", "<Unknown>"),
-            "DelaySeconds":attrs.get("DelaySeconds", "<Unknown>"),
-            "FifoQueue":attrs.get("FifoQueue", "<Unknown>"),
-            "FifoThroughputLimit":attrs.get("FifoThroughputLimit", "<Unknown>"),
-            "KmsDataKeyReusePeriodSeconds":attrs.get("KmsDataKeyReusePeriodSeconds", "<Unknown>"),
-            "KmsMasterKeyId":attrs.get("KmsMasterKeyId", "<Unknown>"),
-            "LastModifiedTimestamp":attrs.get("LastModifiedTimestamp", "<Unknown>"),
-            "MaximumMessageSize":attrs.get("MaximumMessageSize", "<Unknown>"),
-            "MessageRetentionPeriod":attrs.get("MessageRetentionPeriod", "<Unknown>"),
-            "Policy":attrs.get("Policy", "<Unknown>"),
-            "QueueArn":attrs.get("QueueArn", "<Unknown>"),
-            "ReceiveMessageWaitTimeSeconds":attrs.get("ReceiveMessageWaitTimeSeconds", "<Unknown>"),
-            "RedriveAllowPolicy":attrs.get("RedriveAllowPolicy", "<Unknown>"),
-            "RedrivePolicy":attrs.get("RedrivePolicy", "<Unknown>"),
-            "SqsManagedSseEnabled":attrs.get("SqsManagedSseEnabled", "<Unknown>"),
-            "VisibilityTimeout":attrs.get("VisibilityTimeout", "<Unknown>"),
-        }
+        return {name: attrs.get(name, "<Unknown>") for name in _QUEUE_ATTRS}
 
     @staticmethod
     def _get_queue_name(queue: SQSQueue):

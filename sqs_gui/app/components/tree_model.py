@@ -95,7 +95,7 @@ class TreeItem:
         return self._parent
 
 
-class EditableTreeModel(QAbstractItemModel):
+class CustomTreeModel(QAbstractItemModel):
 
     _rootItem: TreeItem
     _numColumns: int

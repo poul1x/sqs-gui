@@ -1,23 +1,17 @@
-from typing import List, Optional
 from dataclasses import dataclass
+from typing import List
 from enum import Enum
 
-from PyQt5.QtCore import (
-    Qt,
-    QSortFilterProxyModel,
-)
-from PyQt5.QtGui import (
-    QIcon,
-    QStandardItemModel,
-    QStandardItem,
-)
+from PyQt5.QtCore import Qt, QSortFilterProxyModel
+from PyQt5.QtGui import QIcon, QStandardItemModel, QStandardItem
+
 from PyQt5.QtWidgets import (
     QAbstractItemView,
-    QWidget,
+    QHeaderView,
     QVBoxLayout,
     QTableView,
-    QHeaderView,
     QLineEdit,
+    QWidget,
 )
 
 
@@ -34,7 +28,7 @@ class Columns(int, Enum):
     dumpedAt = 2
 
 
-class QueueManager(QWidget):
+class MessageQueuesPane(QWidget):
 
     """Shows list of queues in a table widget"""
 
@@ -78,7 +72,7 @@ class QueueManager(QWidget):
         self._dataModel = dataModel
         self.setLayout(layout)
 
-    def addQueueItem(self, item: QueueItem):
+    def addItem(self, item: QueueItem):
 
         roFlags = Qt.ItemIsSelectable | Qt.ItemIsEnabled
         rwFlags = Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled
@@ -95,6 +89,6 @@ class QueueManager(QWidget):
         row = [itemName, itemMessages, itemDumpedAt]
         self._dataModel.appendRow(row)
 
-    def setQueueItems(self, items: List[QueueItem]):
+    def setItems(self, items: List[QueueItem]):
         for item in items:
-            self.addQueueItem(item)
+            self.addItem(item)
