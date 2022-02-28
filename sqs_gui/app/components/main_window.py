@@ -1,42 +1,14 @@
-from asyncio import QueueEmpty
-import datetime
 from typing import List
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+from sqs_gui.app.components.message_tabs import MessageTabs
+from sqs_gui.app.components.messages_pane import MessagesPane
 
 from sqs_gui.app.receiver import Credentials
-
 from .queues_pane import QueueItem, MessageQueuesPane
-
 from .properties_pane import MQPropertiesPane
-
-
-
-class MessageView(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        layout = QVBoxLayout()
-        btnSearch = QPushButton("Search message")
-        mqView = QListWidget()
-        mqView.addItems(["msg-one", "msg-two", "msg-three", "A" * 500])
-        layout.addWidget(mqView)
-        layout.addWidget(btnSearch)
-        mqView.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setLayout(layout)
-
-
-class MyTabBar(QTabBar):
-    def __init__(self) -> None:
-        super().__init__()
-        self.setElideMode(Qt.ElideRight)
-
-    def tabSizeHint(self, i):
-        return QSize(200, 30)
-
-    def tabMinimalSizeHint(self, i):
-        return QSize(200, 30)
+from ..queues import MessageQueue
 
 def credentials():
     return Credentials("root", "toortoor", "us-east-1", "http://localhost:9324")
@@ -44,30 +16,26 @@ def credentials():
 class CentralWidget(QWidget):
 
     _creds: Credentials
+    _queues: List[MessageQueue]
 
     def __init__(self, creds: Credentials):
         super().__init__()
         self._creds = creds
+        self.getMessageQueueList()
+        self.initUserInterface()
+        self.setupSignalHandlers()
+        self.applyStyleSheets()
+        self.refreshQueuesPane()
 
-        # Layouts
-        vBoxLayout = QVBoxLayout()
-        hBoxLayout = QHBoxLayout()
-
-        # Frames
-        topLeftFrame = QFrame()
-        bottomLeftFrame = QFrame()
-        rightFrame = QFrame()
-        topLeftFrame.setFrameShape(QFrame.StyledPanel)
-        bottomLeftFrame.setFrameShape(QFrame.StyledPanel)
-        topLeftFrame.setFrameShape(QFrame.StyledPanel)
-        rightFrame.setFrameShape(QFrame.StyledPanel)
-
+    def getMessageQueueList(self):
         self._queues = list_message_queues(self._creds)
-        mqView = MessageQueuesPane()
+        return self._queues
 
-        for queue in self._queues:
+    def refreshQueuesPane(self):
+
+        for queue in self.getMessageQueueList():
             queueInfo = queue.info()
-            mqView.addItem(
+            self._queuesPane.addItem(
                 QueueItem(
                     queueName=queueInfo.name,
                     numMessages=queueInfo.numMessages,
@@ -75,103 +43,92 @@ class CentralWidget(QWidget):
                 )
             )
 
-        queueInfo = self._queues[0].info()
+    def setupSignalHandlers(self):
+        self._queuesPane.doubleClicked.connect(self.updatePropertiesPane)
 
-        propsPane = MQPropertiesPane()
-        propsPane.setItems(queueInfo.attributes, queueInfo.tags)
-        # propsView.setItems([itemTags, itemAttrs])
-        # propsView.setItems([TreeItem(["c", "d"])])
+    def updatePropertiesPane(self, queueIndex: int):
 
-        msgView = MessageView()
-        msgView2 = MessageView()
-        msgView3 = MessageView()
-        msgView4 = MessageView()
-        msgView5 = MessageView()
-        tabView = QTabWidget()
+        queueInfo = self._queues[queueIndex].info()
+        self._propsPane.setItems(queueInfo.attributes, queueInfo.tags)
+        # self._propsPane.setItems(queueInfo.attributes, queueInfo.tags)
+
+        # Add tab
+        # msgView = MessagesPane()
+        # self._messageTabs.addTab(msgView, "OneTwoThreeFourFiveSixSeven")
+
+    def initPropertiesPane(self):
+        self._propsPane = MQPropertiesPane()
+
+    def applyStyleSheets(self):
+
+        file = QFile(":splitter.qss")
+        if not file.open(QIODevice.ReadOnly):
+            return
+
+        self.setStyleSheet(file.readAll().data().decode())
+        file.close()
+
+    def initUserInterface(self):
+
+        # Higher-level components
+        propsPane = MQPropertiesPane(self)
+        queuesPane = MessageQueuesPane(self)
+        messageTabs = MessageTabs(self)
+
+        msgView = MessagesPane()
+        messageTabs.addTab(msgView, "OneTwoThreeFourFiveSixSeven")
+
+        # msgView2 = MessagesPane()
+        # messageTabs.addTab(msgView2, "aaaa")
+
+        # All frames
+        topLeftFrame = QFrame()
+        topLeftFrame.setFrameShape(QFrame.StyledPanel)
+        bottomLeftFrame = QFrame()
+        bottomLeftFrame.setFrameShape(QFrame.StyledPanel)
+        rightFrame = QFrame()
+        rightFrame.setFrameShape(QFrame.StyledPanel)
 
         # Left frames
-        tmpLayout = QHBoxLayout()
-        tmpLayout.addWidget(mqView)
-        topLeftFrame.setLayout(tmpLayout)
-        tmpLayout = QHBoxLayout()
-        tmpLayout.addWidget(propsPane)
-        bottomLeftFrame.setLayout(tmpLayout)
+        tmpLayout1 = QHBoxLayout()
+        tmpLayout1.addWidget(queuesPane)
+        topLeftFrame.setLayout(tmpLayout1)
 
-        tabView.setTabBar(MyTabBar())
-        tabView.tabBar().setMovable(True)
-        tabView.tabBar().setAutoHide(True)
-        tabView.tabBar().setTabsClosable(True)
-        tabView.tabBar().setUsesScrollButtons(True)
-
-        # Tabs
-        tabView.addTab(msgView, "OneTwoThreeFourFiveSixSeven")
-        tabView.addTab(msgView2, "A" * 50)
-        tabView.addTab(msgView3, "A" * 50)
-        tabView.addTab(msgView4, "A" * 50)
-        tabView.addTab(msgView5, "Two")
-        # tabView.setStyleSheet("QTabBar::tab { max-width: 150px; }")
-
-        # self.layout.add
-        # tabView.setLayout()
-        # rightFrame.
+        tmpLayout2 = QHBoxLayout()
+        tmpLayout2.addWidget(propsPane)
+        bottomLeftFrame.setLayout(tmpLayout2)
 
         # Right frames
-        tmpLayout = QHBoxLayout()
-        tmpLayout.addWidget(tabView)
-        rightFrame.setLayout(tmpLayout)
+        tmpLayout3 = QHBoxLayout()
+        tmpLayout3.addWidget(messageTabs)
+        rightFrame.setLayout(tmpLayout3)
 
-        # Splitter 1
-        splitter1 = QSplitter(Qt.Vertical)
-        splitter1.addWidget(topLeftFrame)
-        splitter1.addWidget(bottomLeftFrame)
-        splitter1.setStretchFactor(0, 2)
-        splitter1.setStretchFactor(1, 3)
-        splitter1.handle(1).setAttribute(Qt.WA_Hover)
-        splitter1.setChildrenCollapsible(False)
+        # Vertical splitter
+        vSplitter = QSplitter(Qt.Vertical)
+        vSplitter.addWidget(topLeftFrame)
+        vSplitter.addWidget(bottomLeftFrame)
+        vSplitter.setStretchFactor(0, 2)
+        vSplitter.setStretchFactor(1, 3)
+        vSplitter.handle(1).setAttribute(Qt.WA_Hover)
+        vSplitter.setChildrenCollapsible(False)
 
-        # Splitter 2
-        splitter2 = QSplitter(Qt.Horizontal)
-        splitter2.addWidget(splitter1)
-        splitter2.addWidget(rightFrame)
-        splitter2.setStretchFactor(0, 2)
-        splitter2.setStretchFactor(1, 3)
-        splitter2.handle(1).setAttribute(Qt.WA_Hover)
-        splitter2.setChildrenCollapsible(False)
+        # Horizontal splitter
+        hSplitter = QSplitter(Qt.Horizontal)
+        hSplitter.addWidget(vSplitter)
+        hSplitter.addWidget(rightFrame)
+        hSplitter.setStretchFactor(0, 2)
+        hSplitter.setStretchFactor(1, 3)
+        hSplitter.handle(1).setAttribute(Qt.WA_Hover)
+        hSplitter.setChildrenCollapsible(False)
 
-        # vBoxLayout.addWidget(splitter1)
-        # vBoxLayout.setStretch(0, 2)
-        # vBoxLayout.setStretch(1, 3)
-
-        # hBoxLayout.addLayout(vBoxLayout)
-        hBoxLayout.addWidget(splitter2)
-
+        hBoxLayout = QHBoxLayout()
+        hBoxLayout.addWidget(hSplitter)
         self.setLayout(hBoxLayout)
 
-        self.setStyleSheet(
-            """
-                /*QVBoxLayout {
-                    border: 1px solid black;
-                }*/
-                QSplitter::handle:hover {
-                    height: 1px;
-                    width: 1px;
-                    background: red;
-                    color:red;
-                }
-                /*QSplitter::handle {
-                    height: 1px;
-                    width: 1px;
-                    background: blue;
-                    color: blue;
-                }*/
-                QSplitter::handle:pressed {
-                    height: 1px;
-                    width: 1px;
-                    background: blue;
-                    color: blue;
-                }
-            """
-        )
+        self._messageTabs = messageTabs
+        self._propsPane = propsPane
+        self._queuesPane = queuesPane
+
 
 
 from ..queues import MessageQueue, list_message_queues
@@ -184,7 +141,7 @@ class MainWindow(QMainWindow):
     def __init__(self, creds: Credentials = credentials()) -> None:
         super().__init__()
         self._creds = creds
-        self.initUI()
+        self.initUserInterface()
 
     def setupExitAction(self):
         exitAction = QAction("&Exit", self)
@@ -199,8 +156,9 @@ class MainWindow(QMainWindow):
     def setupMenuBar(self):
         self.setupExitAction()
 
-    def initUI(self):
+    def initUserInterface(self):
 
+        self.resize(1900, 1200)
         self.setCentralWidget(CentralWidget(self._creds))
         # self.statusBar().showMessage('Ready')
         self.setWindowTitle("SQS Graphical user interface")

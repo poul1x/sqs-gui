@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List
 from enum import Enum
 
-from PyQt5.QtCore import Qt, QSortFilterProxyModel
+from PyQt5.QtCore import Qt, QSortFilterProxyModel, pyqtSignal, QModelIndex
 from PyQt5.QtGui import QIcon, QStandardItemModel, QStandardItem
 
 from PyQt5.QtWidgets import (
@@ -30,13 +30,28 @@ class Columns(int, Enum):
 
 class MessageQueuesPane(QWidget):
 
-    """Shows list of queues in a table widget"""
+    """Shows list of queues in a tableView widget"""
 
-    def __init__(self):
-        super().__init__()
-        self.initUI()
+    _tableView: QTableView
+    _dataModel: QStandardItemModel
 
-    def initUI(self):
+    doubleClicked = pyqtSignal(int)
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.initUserInterface()
+        self.createCustomSignals()
+
+    def slotDoubleClicked(self, index: QModelIndex):
+        self.doubleClicked.emit(index.row())
+
+    def createDoubleClickedSignal(self):
+        self._tableView.doubleClicked.connect(self.slotDoubleClicked)
+
+    def createCustomSignals(self):
+        self.createDoubleClickedSignal()
+
+    def initUserInterface(self):
 
         labels = ["Queue name", "Messages", "Dumped at"]
         dataModel = QStandardItemModel(0, len(Columns))
@@ -47,17 +62,17 @@ class MessageQueuesPane(QWidget):
         filterProxyModel.setFilterCaseSensitivity(Qt.CaseInsensitive)
         filterProxyModel.setFilterKeyColumn(Columns.queueName)
 
-        table = QTableView()
-        table.setModel(filterProxyModel)
-        table.setEditTriggers(QAbstractItemView.EditKeyPressed)
+        tableView = QTableView()
+        tableView.setModel(filterProxyModel)
+        tableView.setEditTriggers(QAbstractItemView.EditKeyPressed)
 
-        hHeader = table.horizontalHeader()
+        hHeader = tableView.horizontalHeader()
         hHeader.setSectionResizeMode(Columns.queueName, QHeaderView.Stretch)
         hHeader.setSectionResizeMode(Columns.numMessages, QHeaderView.ResizeToContents)
         hHeader.setSectionResizeMode(Columns.dumpedAt, QHeaderView.ResizeToContents)
         hHeader.setDefaultAlignment(Qt.AlignLeft)
 
-        vHeader = table.verticalHeader()
+        vHeader = tableView.verticalHeader()
         vHeader.setVisible(False)
 
         searchField = QLineEdit()
@@ -66,9 +81,10 @@ class MessageQueuesPane(QWidget):
         searchField.textChanged.connect(filterProxyModel.setFilterFixedString)
 
         layout = QVBoxLayout()
-        layout.addWidget(table)
+        layout.addWidget(tableView)
         layout.addWidget(searchField)
 
+        self._tableView = tableView
         self._dataModel = dataModel
         self.setLayout(layout)
 

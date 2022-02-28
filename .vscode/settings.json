@@ -3,5 +3,10 @@
   "files.exclude": {
     "venv/": true,
     "sqs_gui/app/resources.py": true
-  }
+  },
+  "python.testing.pytestArgs": [
+    "sqs_gui"
+  ],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true
 }

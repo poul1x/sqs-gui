@@ -56,11 +56,11 @@ class MQPropertiesPane(QWidget):
     _propsModel: CustomTreeModel
     _propsTree: QTreeView
 
-    def __init__(self):
-        super().__init__()
-        self.initUI()
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.initUserInterface()
 
-    def initUI(self):
+    def initUserInterface(self):
 
         headers = TreeItem(["Property name", "Value"])
         self._propsModel = CustomTreeModel(headers, self)

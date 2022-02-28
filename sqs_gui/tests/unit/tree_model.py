@@ -6,7 +6,6 @@ from PyQt5.QtWidgets import QWidget
 
 # See https://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html
 
-
 class TreeItem:
 
     _dataItems: List[str]
@@ -70,6 +69,8 @@ class TreeItem:
         self._children.remove(item)
 
     def removeChildren(self):
+        for child in self._children:
+            child._parent = None
         self._children.clear()
 
     def childCount(self):
@@ -109,30 +110,18 @@ class CustomTreeModel(QAbstractItemModel):
     def setItems(self, treeItems: List[TreeItem]):
 
         self.layoutAboutToBeChanged.emit()
-        index = self.createIndex(0, 0, self._rootItem)
 
-        self.beginRemoveRows(index, 0, self._rootItem.childCount() - 1)
         self._rootItem.removeChildren()
-        self.endRemoveRows()
-
-        self.layoutChanged.emit()
-
-        self.layoutAboutToBeChanged.emit()
-        self.beginInsertRows(index, 0, len(treeItems) - 1)
-
         for item in treeItems:
             assert item.columnCount() == self._numColumns
             self._rootItem.addChild(item)
 
-        self.endInsertRows()
-        self.layoutChanged.emit()
-
         # self.changePersistentIndex(
         #     self.createIndex(0, 0, self._rootItem),
-        #     self.createIndex(0, 0, None),
+        #     self.createIndex(self._rootItem.childCount(), 0, self._rootItem),
         # )
 
-        # self.layoutChanged.emit()
+        self.layoutChanged.emit()
 
     def itemFromIndex(self, index: QModelIndex) -> TreeItem:
 
