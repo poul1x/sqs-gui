@@ -1,10 +1,12 @@
 from __future__ import annotations
+from turtle import pos, position
 from typing import List, Optional, Any
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex
 from PyQt5.QtWidgets import QWidget
 
 # See https://doc.qt.io/qt-5/qtwidgets-itemviews-simpletreemodel-example.html
+# See https://doc.qt.io/qt-5/qtwidgets-itemviews-editabletreemodel-example.html
 
 
 class TreeItem:
@@ -65,12 +67,56 @@ class TreeItem:
         item._parent = self
         self._children.append(item)
 
-    def removeChild(self, item: TreeItem):
-        item._parent = None
-        self._children.remove(item)
+    def insertChildren(self, position: int, count: int, columns: int):
 
-    def removeChildren(self):
-        self._children.clear()
+        if position < 0 or position > len(self._children):
+            return False
+
+        for _ in range(count):
+            dataItems = [""] * columns
+            item = TreeItem(dataItems, self)
+            self._children.insert(position, item)
+
+        return True
+
+    def removeChildren(self, position: int, count: int):
+
+        if position < 0 or position > len(self._children):
+            return False
+
+        for _ in range(count):
+            del self._children[position]
+
+        return True
+
+    def insertColumns(self, position: int, columns: int):
+
+        if position < 0 or position > len(self._dataItems):
+            return False
+
+        for _ in range(columns):
+            self._dataItems.insert(position, None)
+
+        for child in self._children:
+            child.insertColumns(position, columns)
+
+        return True
+
+    def removeColumns(self, position: int, columns: int):
+
+        if position < 0 or position > len(self._dataItems):
+            return False
+
+        for _ in range(columns):
+            del self._dataItems[position]
+
+        for child in self._children:
+            child.removeColumns(position, columns)
+
+        return True
+
+    def removeChild(self, item: TreeItem):
+        self._children.remove(item)
 
     def childCount(self):
         return len(self._children)
@@ -95,7 +141,6 @@ class TreeItem:
 class CustomTreeModel(QAbstractItemModel):
 
     _rootItem: TreeItem
-    _numColumns: int
 
     def __init__(
         self,
@@ -104,35 +149,16 @@ class CustomTreeModel(QAbstractItemModel):
     ):
         super().__init__(parent)
         self._rootItem = headers
-        self._numColumns = headers.columnCount()
 
     def setItems(self, treeItems: List[TreeItem]):
 
         self.layoutAboutToBeChanged.emit()
-        index = self.createIndex(0, 0, self._rootItem)
-
-        self.beginRemoveRows(index, 0, self._rootItem.childCount() - 1)
-        self._rootItem.removeChildren()
-        self.endRemoveRows()
-
-        self.layoutChanged.emit()
-
-        self.layoutAboutToBeChanged.emit()
-        self.beginInsertRows(index, 0, len(treeItems) - 1)
+        self.removeRows(0, self.rowCount())
 
         for item in treeItems:
-            assert item.columnCount() == self._numColumns
             self._rootItem.addChild(item)
 
-        self.endInsertRows()
         self.layoutChanged.emit()
-
-        # self.changePersistentIndex(
-        #     self.createIndex(0, 0, self._rootItem),
-        #     self.createIndex(0, 0, None),
-        # )
-
-        # self.layoutChanged.emit()
 
     def itemFromIndex(self, index: QModelIndex) -> TreeItem:
 
@@ -141,7 +167,9 @@ class CustomTreeModel(QAbstractItemModel):
 
         return index.internalPointer()
 
-    def index(self, row: int, column: int, parent: QModelIndex) -> QModelIndex:
+    def index(
+        self, row: int, column: int, parent: QModelIndex = QModelIndex()
+    ) -> QModelIndex:
 
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
@@ -154,7 +182,7 @@ class CustomTreeModel(QAbstractItemModel):
 
         return self.createIndex(row, column, childItem)
 
-    def parent(self, index: QModelIndex) -> QModelIndex:
+    def parent(self, index: QModelIndex = QModelIndex()) -> QModelIndex:
 
         childItem = self.itemFromIndex(index)
         parentItem = childItem.parentItem()
@@ -164,7 +192,7 @@ class CustomTreeModel(QAbstractItemModel):
 
         return self.createIndex(parentItem.row(), 0, parentItem)
 
-    def rowCount(self, parent: QModelIndex) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
 
         if parent.column() > 0:
             return 0
@@ -172,8 +200,8 @@ class CustomTreeModel(QAbstractItemModel):
         parentItem = self.itemFromIndex(parent)
         return parentItem.childCount()
 
-    def columnCount(self, parent: QModelIndex) -> int:
-        return self._numColumns
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return self._rootItem.columnCount()
 
     def data(self, index: QModelIndex, role: int) -> Any:
 
@@ -211,7 +239,12 @@ class CustomTreeModel(QAbstractItemModel):
             return False
 
         item: TreeItem = index.internalPointer()
-        return item.setData(index.column(), value)
+        result = item.setData(index.column(), value)
+
+        if result:
+            self.dataChanged.emit(index, index, [Qt.DisplayRole, Qt.EditRole])
+
+        return result
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int) -> Any:
 
@@ -219,3 +252,66 @@ class CustomTreeModel(QAbstractItemModel):
             return self._rootItem.data(section)
 
         return None
+
+    def setHeaderData(
+        self, section: int, orientation: Qt.Orientation, value: Any, role: int
+    ) -> bool:
+
+        if role != Qt.EditRole or orientation != Qt.Horizontal:
+            return False
+
+        result = self._rootItem.setData(section, value)
+
+        if result:
+            self.headerDataChanged.emit(orientation, section, section)
+
+        return result
+
+    def insertRows(
+        self, row: int, count: int, parent: QModelIndex = QModelIndex()
+    ) -> bool:
+        parentItem = self.itemFromIndex(parent)
+        self.beginInsertRows(parent, row, row + count - 1)
+        status = parentItem.insertChildren(row, count, self.columnCount())
+        self.endInsertRows()
+        return status
+
+    def insertRow(self, row: int, parent: QModelIndex = QModelIndex()) -> bool:
+        return self.insertRows(row, 1, parent)
+
+    def insertColumns(
+        self, column: int, count: int, parent: QModelIndex = QModelIndex()
+    ) -> bool:
+        self.beginInsertColumns(parent, column, column + count - 1)
+        status = self._rootItem.insertColumns(column, count)
+        self.endInsertColumns()
+        return status
+
+    def insertColumn(self, column: int, parent: QModelIndex = QModelIndex()) -> bool:
+        return self.insertColumns(column, 1, parent)
+
+    def removeRows(
+        self, row: int, count: int, parent: QModelIndex = QModelIndex()
+    ) -> bool:
+        parentItem = self.itemFromIndex(parent)
+        self.beginRemoveRows(parent, row, row + count - 1)
+        status = parentItem.removeChildren(row, count)
+        self.endRemoveRows()
+        return status
+
+    def removeRow(self, row: int, parent: QModelIndex = QModelIndex()) -> bool:
+        self.removeRows(row, 1, parent)
+
+    def removeColumns(self, column: int, count: int, parent: QModelIndex) -> bool:
+
+        self.beginRemoveColumns(parent, column, column + count - 1)
+        status = self._rootItem.removeColumns(column, count)
+        self.endRemoveColumns()
+
+        if self._rootItem.columnCount() == 0:
+            self.removeRows(0, self.rowCount())
+
+        return status
+
+    def removeColumn(self, column: int, parent: QModelIndex = QModelIndex()) -> bool:
+        return self.removeColumns(column, 1, parent)
