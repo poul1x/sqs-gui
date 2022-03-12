@@ -57,14 +57,16 @@ class MessageQueuesPane(QWidget):
         dataModel = QStandardItemModel(0, len(Columns))
         dataModel.setHorizontalHeaderLabels(labels)
 
-        filterProxyModel = QSortFilterProxyModel()
-        filterProxyModel.setSourceModel(dataModel)
-        filterProxyModel.setFilterCaseSensitivity(Qt.CaseInsensitive)
-        filterProxyModel.setFilterKeyColumn(Columns.queueName)
+        proxyModel = QSortFilterProxyModel()
+        proxyModel.setSourceModel(dataModel)
+        proxyModel.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        proxyModel.setFilterKeyColumn(Columns.queueName)
 
         tableView = QTableView()
-        tableView.setModel(filterProxyModel)
+        tableView.setModel(proxyModel)
         tableView.setEditTriggers(QAbstractItemView.EditKeyPressed)
+        tableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        # tableView.setSortingEnabled(True)
 
         hHeader = tableView.horizontalHeader()
         hHeader.setSectionResizeMode(Columns.queueName, QHeaderView.Stretch)
@@ -78,7 +80,7 @@ class MessageQueuesPane(QWidget):
         searchField = QLineEdit()
         searchField.setPlaceholderText("Enter queue name to find")
         searchField.addAction(QIcon(":search.svg"), QLineEdit.LeadingPosition)
-        searchField.textChanged.connect(filterProxyModel.setFilterFixedString)
+        searchField.textChanged.connect(proxyModel.setFilterFixedString)
 
         layout = QVBoxLayout()
         layout.addWidget(tableView)
@@ -108,3 +110,7 @@ class MessageQueuesPane(QWidget):
     def setItems(self, items: List[QueueItem]):
         for item in items:
             self.addItem(item)
+
+    def selectedRows(self):
+        selection = self._tableView.selectionModel()
+        return [index.row() for index in selection.selectedRows()]

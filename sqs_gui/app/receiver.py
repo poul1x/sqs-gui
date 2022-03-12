@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 from queue import Queue
-from socket import timeout
 from threading import Lock, Thread
 from time import sleep
-from typing import List, Optional, Set
+from typing import Iterator, List, Optional, Set
 import boto3
 import os
 
@@ -14,12 +13,7 @@ from mypy_boto3_sqs.service_resource import (
     Message,
 )
 
-from botocore.exceptions import ClientError
-from .util import TimeMeasure, random_string
-
-from concurrent.futures import ThreadPoolExecutor, wait
-
-QUEUE_TEST = os.environ["MQ_QUEUE_TEST1"]
+from .util import random_string
 
 # def ping(self):
 #     try:
@@ -47,38 +41,6 @@ class Credentials:
     secret_key: int
     region_name: str
     endpoint_url: Optional[str]
-
-
-def send_many_messages(n: int, credentials: Credentials):
-
-    session = boto3.Session()
-    sqs: SQSServiceResource = session.resource(
-        service_name="sqs",
-        region_name=credentials.region_name,
-        aws_access_key_id=credentials.access_key,
-        aws_secret_access_key=credentials.secret_key,
-        endpoint_url=credentials.endpoint_url,
-    )
-
-    queue: SQSQueue = sqs.get_queue_by_name(QueueName=QUEUE_TEST)
-    queue.purge()
-
-    for _ in range(n):
-        queue.send_message(MessageBody=random_string(40))
-
-def receive_message(credentials: Credentials):
-
-    session = boto3.Session()
-    sqs: SQSServiceResource = session.resource(
-        service_name="sqs",
-        region_name=credentials.region_name,
-        aws_access_key_id=credentials.access_key,
-        aws_secret_access_key=credentials.secret_key,
-        endpoint_url=credentials.endpoint_url,
-    )
-
-    queue: SQSQueue = sqs.get_queue_by_name(QueueName=QUEUE_TEST)
-    queue.receive_messages(MaxNumberOfMessages=1)
 
 
 class SQSMessageIterator:
@@ -171,6 +133,7 @@ class SQSMessageIterator:
             messages = queue.receive_messages(
                 MaxNumberOfMessages=self._max_num_of_msgs,
                 VisibilityTimeout=self._conditions.timeout,
+                AttributeNames=["All"],
                 WaitTimeSeconds=0,
             )
 
@@ -216,33 +179,33 @@ class SQSMessageIterator:
         self._unique_messages.put(None)
 
 
-if __name__ == "__main__":
+def receiveMessages(
+    queue_name: str,
+    credentials: Credentials,
+    conditions: ReceiveConditions,
+    num_workers: Optional[int] = None,
+) -> Iterator[Message]:
 
-    credentials = Credentials(
-        access_key=os.environ["MQ_USERNAME"],
-        secret_key=os.environ["MQ_PASSWORD"],
-        region_name=os.environ["MQ_REGION"],
-        endpoint_url=os.environ["MQ_URL"],
+    return SQSMessageIterator(
+        queue_name,
+        credentials,
+        conditions,
+        num_workers,
     )
 
-    conditions = ReceiveConditions(
-        all=True,
-        count=1,
-        timeout=10,
+
+def sendMessages(queue_name: str, n: int, credentials: Credentials):
+
+    session = boto3.Session()
+    sqs: SQSServiceResource = session.resource(
+        service_name="sqs",
+        region_name=credentials.region_name,
+        aws_access_key_id=credentials.access_key,
+        aws_secret_access_key=credentials.secret_key,
+        endpoint_url=credentials.endpoint_url,
     )
 
-    # receive_message(credentials)
-    # exit(0)
+    queue: SQSQueue = sqs.get_queue_by_name(QueueName=queue_name)
 
-    send_many_messages(1000, credentials)
-
-    measure = TimeMeasure()
-    i = 0
-    with measure.measuring():
-        msg: Message
-        for msg in SQSMessageIterator(QUEUE_TEST, credentials, conditions):
-            i += 1
-
-    print("Received - ", i)
-    print("Elapsed - ", measure.elapsed.seconds)
-
+    for i in range(n):
+        queue.send_message(MessageBody=f"message-{i}-{random_string(10)}")

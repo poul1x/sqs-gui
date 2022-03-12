@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
     QTabBar,
 )
 
+
 class MessageTabBar(QTabBar):
 
     """Custom tab bar settings"""

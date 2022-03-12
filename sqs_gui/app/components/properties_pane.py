@@ -65,13 +65,13 @@ class MQPropertiesPane(QWidget):
         headers = TreeItem(["Property name", "Value"])
         self._propsModel = CustomTreeModel(headers, self)
 
-        filterProxyModel = QSortFilterProxyModel(self)
-        filterProxyModel.setSourceModel(self._propsModel)
-        filterProxyModel.setFilterCaseSensitivity(Qt.CaseInsensitive)
-        filterProxyModel.setRecursiveFilteringEnabled(True)
+        proxyModel = QSortFilterProxyModel(self)
+        proxyModel.setSourceModel(self._propsModel)
+        proxyModel.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        proxyModel.setRecursiveFilteringEnabled(True)
 
         self._propsTree = QTreeView()
-        self._propsTree.setModel(filterProxyModel)
+        self._propsTree.setModel(proxyModel)
 
         header = self._propsTree.header()
         header.setSectionResizeMode(QHeaderView.Interactive)
@@ -81,7 +81,7 @@ class MQPropertiesPane(QWidget):
         searchField = QLineEdit()
         searchField.setPlaceholderText("Enter property name to find")
         searchField.addAction(QIcon(":search.svg"), QLineEdit.LeadingPosition)
-        searchField.textChanged.connect(filterProxyModel.setFilterFixedString)
+        searchField.textChanged.connect(proxyModel.setFilterFixedString)
 
         layout = QVBoxLayout()
         layout.addWidget(self._propsTree)

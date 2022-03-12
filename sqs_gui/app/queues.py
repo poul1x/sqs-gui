@@ -80,7 +80,6 @@ class MessageQueue:
 
     _queue: SQSQueue
     _queue_name: str
-    _service_name = "sqs"
     _sqs: SQSServiceResource
 
     def __init__(self, queue: SQSQueue):
@@ -127,7 +126,7 @@ class MessageQueue:
             name=self._queue_name,
             numMessages=numMessages,
             attributes=attributes,
-            dumpDate=self._current_date(),
+            dumpDate=datetime.now(),
             tags=self._get_queue_tags(),
         )
 

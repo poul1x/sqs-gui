@@ -1,5 +1,4 @@
 from __future__ import annotations
-from turtle import pos, position
 from typing import List, Optional, Any
 
 from PyQt5.QtCore import Qt, QAbstractItemModel, QModelIndex
@@ -73,7 +72,7 @@ class TreeItem:
             return False
 
         for _ in range(count):
-            dataItems = [""] * columns
+            dataItems = [None] * columns
             item = TreeItem(dataItems, self)
             self._children.insert(position, item)
 
