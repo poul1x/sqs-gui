@@ -10,31 +10,6 @@ import boto3
 
 
 @dataclass
-class QueueAttributes:
-    numMessages: Optional[str]
-    numMessagesDelayed: Optional[str]
-    numMessagesNotVisible: Optional[str]
-    contentBasedDeduplication: Optional[str]
-    createdTimestamp: Optional[str]
-    deduplicationScope: Optional[str]
-    delaySeconds: Optional[str]
-    fifoQueue: Optional[str]
-    fifoThroughputLimit: Optional[str]
-    kmsDataKeyReusePeriodSeconds: Optional[str]
-    kmsMasterKeyId: Optional[str]
-    lastModifiedTimestamp: Optional[str]
-    maximumMessageSize: Optional[str]
-    messageRetentionPeriod: Optional[str]
-    policy: Optional[str]
-    queueArn: Optional[str]
-    receiveMessageWaitTimeSeconds: Optional[str]
-    redriveAllowPolicy: Optional[str]
-    redrivePolicy: Optional[str]
-    sqsManagedSseEnabled: Optional[str]
-    visibilityTimeout: Optional[str]
-
-
-@dataclass
 class QueueInfo:
     url: str
     name: str
@@ -72,7 +47,6 @@ from mypy_boto3_sqs.client import SQSClient
 from mypy_boto3_sqs.service_resource import (
     SQSServiceResource,
     Queue as SQSQueue,
-    Message,
 )
 
 
@@ -127,8 +101,12 @@ class MessageQueue:
             numMessages=numMessages,
             attributes=attributes,
             dumpDate=datetime.now(),
-            tags=self._get_queue_tags(),
+            tags={},#self._get_queue_tags(),
         )
+
+    def purge(self):
+        self._queue.purge()
+
 
 
 SERVICE_NAME = "sqs"

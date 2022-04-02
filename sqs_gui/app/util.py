@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from pydantic import BaseModel
 from typing import Optional
 import functools
 import random

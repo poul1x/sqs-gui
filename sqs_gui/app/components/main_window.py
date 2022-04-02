@@ -9,25 +9,34 @@ from sqs_gui.app.components.messages_pane import MessageItem, MessagesPane
 from sqs_gui.app.components.hints_pane import HintsPane
 
 from sqs_gui.app.receiver import Credentials, ReceiveConditions, receiveMessages
+from sqs_gui.app.storage import MessageDiskStorage
 from .queues_pane import QueueItem, MessageQueuesPane
 from .properties_pane import MQPropertiesPane
 from ..queues import MessageQueue, QueueInfo, list_message_queues
-from ..receiver import Message, sendMessages
+from ..receiver import SQSMessage, sendMessages
+
+
+# def credentials():
+#     return Credentials("root", "toortoor", "us-east-1", "http://localhost:9324")
 
 
 def credentials():
-    return Credentials("root", "toortoor", "us-east-1", "http://localhost:9324")
+    return Credentials(
+        "1",
+        "1",
+        "us-east1",
+        "http://localhost:9324",
+    )
 
 
 HINT_TAB = "Hints"
-
 
 
 class CentralWidget(QWidget):
 
     _creds: Credentials
     _queues: List[MessageQueue]
-    _messages: Dict[str, List[Message]]
+    _messages: Dict[str, List[SQSMessage]]
 
     _queuesPane: MessageQueuesPane
     _propsPane: MQPropertiesPane
@@ -99,11 +108,15 @@ class CentralWidget(QWidget):
         def threadedReceive():
 
             messages = self._messages[queueInfo.name]
-            conditions = ReceiveConditions(all=False, count=1000, timeout=5)
+            conditions = ReceiveConditions(all=True, count=200, timeout=1)
 
-            for msg in receiveMessages(queueInfo.name, self._creds, conditions):
+            storage = MessageDiskStorage(queueInfo.name)
+            loadedMessages = storage.loadMessages()
+            storage.startReceivingJobs()
 
-                sendTimestamp = msg.attributes["SentTimestamp"]
+            for msg in loadedMessages:
+
+                sendTimestamp = msg.sysAttributes["SentTimestamp"]
                 sendDate = datetime.fromtimestamp(int(sendTimestamp) // 1000)
 
                 item = MessageItem(
@@ -114,6 +127,29 @@ class CentralWidget(QWidget):
 
                 messagesPane.addItem(item)
                 messages.append(msg)
+
+            uids = set(map(lambda x: x.id, loadedMessages))
+            for msg in receiveMessages(
+                queueInfo.name,
+                self._creds,
+                conditions,
+                msg_ids_exclude=uids,
+            ):
+
+                sendTimestamp = msg.sysAttributes["SentTimestamp"]
+                sendDate = datetime.fromtimestamp(int(sendTimestamp) // 1000)
+
+                item = MessageItem(
+                    sendTimestamp=sendTimestamp,
+                    sendDate=sendDate.strftime("%c"),
+                    messageBody=msg.body[:256],
+                )
+
+                storage.saveMessage(msg)
+                messagesPane.addItem(item)
+                messages.append(msg)
+
+            storage.stopReceivingJobs()
 
         Thread(target=threadedReceive).start()
 
@@ -136,13 +172,15 @@ class CentralWidget(QWidget):
 
     def onTabClose(self, index: int):
 
-        # Remove received messages
         queueName = self._messageTabs.tabText(index)
+        if queueName == HINT_TAB:
+            return
+
+        # Remove received messages
         self._messages[queueName].clear()
 
         # Remove tab
-        widget = self._messageTabs.removeTab(index)
-
+        self._messageTabs.removeTab(index)
 
     def initUserInterface(self):
 
@@ -203,9 +241,6 @@ class CentralWidget(QWidget):
         self._propsPane = propsPane
         self._queuesPane = queuesPane
 
-    def selectedQueues(self):
-        return self._queuesPane.selectedQueues()
-
     @property
     def queues(self):
         return self._queues
@@ -248,14 +283,32 @@ class MainWindow(QMainWindow):
 
     def setupQueueActions(self):
 
-        reloadAction = QAction("&Exit", self)
+        # reloadAction = QAction("&Exit", self)
         # reloadAction.setShortcut("Ctrl+Q")
-        reloadAction.setStatusTip("Reload queue")
-        reloadAction.triggered.connect()
+        # reloadAction.setStatusTip("Reload queue")
+        # reloadAction.triggered.connect()
+
+        queuePurgeAction = QAction("&Purge", self)
+        # queuePurgeAction.setShortcut("Ctrl+Q")
+        # queuePurgeAction.setStatusTip("Purge queue")
+        centralWidget: CentralWidget = self.centralWidget()
+
+        def purge():
+
+            selectedRows = centralWidget.queuesPane.selectedRows()
+
+            def purge2(row):
+                queue = centralWidget.queues[row]
+                queue.purge()
+
+            for row in selectedRows:
+                Thread(target=purge2, args=(row,)).start()
+
+        queuePurgeAction.triggered.connect(lambda: purge())
 
         menubar = self.menuBar()
         fileMenu = menubar.addMenu("&Queue")
-        fileMenu.addAction(reloadAction)
+        fileMenu.addAction(queuePurgeAction)
 
     def setupDeveloperActions(self):
 
@@ -269,11 +322,10 @@ class MainWindow(QMainWindow):
 
             def send2(row):
                 queue = centralWidget.queues[row]
-                sendMessages(queue.name, 1000, self._creds)
+                sendMessages(queue.name, 10000, self._creds)
 
             for row in selectedRows:
                 Thread(target=send2, args=(row,)).start()
-
 
         sendAction.triggered.connect(lambda: send())
 
@@ -284,7 +336,7 @@ class MainWindow(QMainWindow):
     def setupMenuBar(self):
         self.setupExitAction()
         self.setupDeveloperActions()
-        # self.setupQueueActions()
+        self.setupQueueActions()
 
     def initUserInterface(self):
 

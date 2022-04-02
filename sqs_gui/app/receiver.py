@@ -2,16 +2,25 @@ from dataclasses import dataclass
 from queue import Queue
 from threading import Lock, Thread
 from time import sleep
-from typing import Iterator, List, Optional, Set
+from typing import Dict, Iterator, List, Optional, Set
 import boto3
 import os
 
-from mypy_boto3_sqs.client import SQSClient
-from mypy_boto3_sqs.service_resource import (
-    SQSServiceResource,
-    Queue as SQSQueue,
-    Message,
-)
+from pydantic import BaseModel
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mypy_boto3_sqs.client import SQSClient
+    from mypy_boto3_sqs.service_resource import (
+        SQSServiceResource,
+        Message as SQSMessage,
+        Queue as SQSQueue,
+    )
+else:
+    SQSServiceResource = object
+    SQSMessage = object
+    SQSQueue = object
 
 from .util import random_string
 
@@ -33,6 +42,16 @@ class ReceiveConditions:
 
     timeout: int
     """Receive messages until timeout expiration"""
+
+
+class Message(BaseModel):
+    id: str
+    body: str
+    md5OfBody: str
+    attributes: Optional[Dict[str, dict]]
+    md5OfAttributes: Optional[str]
+    sysAttributes: Dict[str, str]
+    receiptHandle: str
 
 
 @dataclass
@@ -62,6 +81,7 @@ class SQSMessageIterator:
         credentials: Credentials,
         conditions: ReceiveConditions,
         num_workers: Optional[int] = None,
+        msg_ids_exclude = set(),
     ):
         if num_workers is None:
             num_workers = os.cpu_count() or 2
@@ -73,7 +93,7 @@ class SQSMessageIterator:
         self._shutdown = False
         self._worker_threads = list()
         self._unique_messages = Queue()
-        self._unique_message_ids = set()
+        self._unique_message_ids = msg_ids_exclude
         self._checker_thread = Thread(target=self.checker_thread)
         self._conditions = conditions
         self._queue_name = queue_name
@@ -133,6 +153,7 @@ class SQSMessageIterator:
             messages = queue.receive_messages(
                 MaxNumberOfMessages=self._max_num_of_msgs,
                 VisibilityTimeout=self._conditions.timeout,
+                MessageAttributeNames=["All"],
                 AttributeNames=["All"],
                 WaitTimeSeconds=0,
             )
@@ -151,8 +172,18 @@ class SQSMessageIterator:
                         continue
 
                     # Save received message
-                    self._unique_message_ids.add(message.message_id)
-                    self._unique_messages.put(message)
+                    saved_msg = Message(
+                        id=message.message_id,
+                        body=message.body,
+                        md5OfBody=message.md5_of_body,
+                        attributes=message.message_attributes,
+                        md5OfAttributes=message.md5_of_message_attributes,
+                        sysAttributes=message.attributes,
+                        receiptHandle=message.receipt_handle,
+                    )
+
+                    self._unique_message_ids.add(saved_msg.id)
+                    self._unique_messages.put(saved_msg)
 
                 # First N messages have been received -> exit
                 # `Count` condition is fulfilled
@@ -184,6 +215,7 @@ def receiveMessages(
     credentials: Credentials,
     conditions: ReceiveConditions,
     num_workers: Optional[int] = None,
+    msg_ids_exclude = set(),
 ) -> Iterator[Message]:
 
     return SQSMessageIterator(
@@ -191,6 +223,7 @@ def receiveMessages(
         credentials,
         conditions,
         num_workers,
+        msg_ids_exclude,
     )
 
 

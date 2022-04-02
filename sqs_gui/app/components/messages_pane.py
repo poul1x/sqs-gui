@@ -10,9 +10,8 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QWidget,
 )
-from pyparsing import col
 
-from ..receiver import Message
+from ..receiver import SQSMessage
 
 from dataclasses import dataclass
 from typing import List
@@ -31,7 +30,7 @@ class MessageItem:
     sendDate: str
     messageBody: str
 
-class CustomSortproxyModel(QSortFilterProxyModel):
+class CustomSortProxyModel(QSortFilterProxyModel):
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -74,7 +73,7 @@ class MessagesPane(QWidget):
         dataModel = QStandardItemModel(0, len(Columns))
         dataModel.setHorizontalHeaderLabels(labels)
 
-        proxyModel = CustomSortproxyModel()
+        proxyModel = CustomSortProxyModel()
         proxyModel.setSourceModel(dataModel)
         proxyModel.setFilterCaseSensitivity(Qt.CaseInsensitive)
 
